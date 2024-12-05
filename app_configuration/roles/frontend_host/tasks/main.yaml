@@ -1,0 +1,80 @@
+---
+- name: Gather system facts
+  ansible.builtin.setup:
+
+- name: Gather EC2 metadata facts
+  amazon.aws.ec2_metadata_facts:
+
+- name: Update APT cache
+  ansible.builtin.apt:
+    update_cache: yes
+    allow_unauthenticated: yes
+  become: true
+
+- name: Ensure required packages are installed
+  ansible.builtin.package:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ caddy_dependencies }}"
+  become: true
+
+- name: apt install caddy
+  ansible.builtin.shell:
+    cmd: "apt install -y debian-keyring debian-archive-keyring apt-transport-https curl"
+  become: true
+
+# https://caddyserver.com/docs/install#debian-ubuntu-raspbian
+- name: Add Caddy repository GPG key
+  ansible.builtin.shell:
+    cmd: "curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-archive-keyring.gpg"
+  become: true
+
+# https://caddyserver.com/docs/install#debian-ubuntu-raspbian
+- name: Install stable list 
+  ansible.builtin.shell:
+    cmd: "curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list"
+  become: true 
+
+#https://caddyserver.com/docs/install#debian-ubuntu-raspbian
+- name: Install Caddy
+  ansible.builtin.package:
+    name: caddy
+    state: present
+  become: true
+
+- name: Copy index.html to /var/www/html
+  ansible.builtin.copy:
+    src: index.html
+    dest: /var/www/html/index.html
+    owner: caddy
+    group: caddy
+    mode: '0644'
+  become: true
+
+- name: Copy client.js to /var/www/html
+  ansible.builtin.copy:
+    src: client.js
+    dest: /var/www/html/client.js
+    owner: caddy
+    group: caddy
+    mode: '0644'
+  become: true
+
+- name: Generate config.js from template
+  ansible.builtin.template:
+    src: config.js.j2
+    dest: /var/www/html/config.js
+    owner: caddy
+    group: caddy
+    mode: '0644'
+  become: true
+
+- name: Generate Caddyfile from template
+  ansible.builtin.template:
+    src: Caddyfile.j2
+    dest: /etc/caddy/Caddyfile
+    owner: root
+    group: caddy
+    mode: '0644'
+  become: true
+  notify: Restart and enable Caddy

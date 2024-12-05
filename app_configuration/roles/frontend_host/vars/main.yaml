@@ -1,0 +1,3 @@
+caddy_dependencies:
+  - curl
+  - apt-transport-https
